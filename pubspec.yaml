@@ -1,0 +1,24 @@
+name: belugang_verification
+description: A Flutter application for Belugang verification.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.12.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.1
+  url_launcher: ^6.0.13
+  flutter_secure_storage: ^5.0.0
+  shared_preferences: ^2.0.8
+  path_provider: ^2.0.5
+  file_picker: ^4.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
