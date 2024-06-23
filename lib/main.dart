@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(BelugangVerificationApp());
@@ -65,6 +66,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _name;
   String? _username;
   Uint8List? _selectedImageBytes;
+  static const int _cooldownDuration = 600; // Cooldown duration in seconds
 
   void _discordServer() async {
     const url = 'https://discord.gg/belugang-2-1231948380285042688';
@@ -88,7 +90,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _submitForm() async {
+  Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
       _formKey.currentState?.save();
       if (_selectedImageBytes == null) {
@@ -96,47 +98,76 @@ class _MyHomePageState extends State<MyHomePage> {
           SnackBar(content: Text('Please upload an image')),
         );
       } else {
-        String webhookUrl =
-            'https://discord.com/api/webhooks/1252893173370322944/iaCLkS2J1D3YBzTm5canlx_msqpihbutKZjU2mDUt8KwEtKAl8f0DXrZg4Vjli4FO94k';
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        int? lastSubmissionTime = prefs.getInt('lastSubmissionTime');
+        int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-        try {
-          var request = http.MultipartRequest('POST', Uri.parse(webhookUrl));
-          request.headers['Content-Type'] = 'multipart/form-data';
+        if (lastSubmissionTime == null ||
+            currentTime - lastSubmissionTime >= _cooldownDuration) {
+          String webhookUrl =
+              'https://discord.com/api/webhooks/1252893173370322944/iaCLkS2J1D3YBzTm5canlx_msqpihbutKZjU2mDUt8KwEtKAl8f0DXrZg4Vjli4FO94k';
 
-          // Add text fields
-          request.fields['content'] = '''
-            Form Submitted:
-            Name or Nickname: $_name
-            Discord Username: $_username
-          ''';
+          try {
+            var request = http.MultipartRequest('POST', Uri.parse(webhookUrl));
+            request.headers['Content-Type'] = 'multipart/form-data';
 
-          // Add image file
-          request.files.add(http.MultipartFile.fromBytes(
-            'file',
-            _selectedImageBytes!,
-            filename: 'image.jpg',
-          ));
+            // Add text fields
+            request.fields['content'] = '''
+              Form Submitted:
+              Name or Nickname: $_name
+              Discord Username: $_username
+            ''';
 
-          var response = await request.send();
+            // Add image file
+            request.files.add(http.MultipartFile.fromBytes(
+              'file',
+              _selectedImageBytes!,
+              filename: 'image.jpg',
+            ));
 
-          if (response.statusCode == 200) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Form Submitted Successfully!')),
-            );
-          } else {
+            var response = await request.send();
+
+            if (response.statusCode == 200) {
+              prefs.setInt('lastSubmissionTime', currentTime);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Form Submitted Successfully!')),
+              );
+              // Reload the page
+              Future.delayed(Duration(seconds: 2), () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (BuildContext context) =>
+                        MyHomePage(title: widget.title),
+                  ),
+                );
+              });
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content:
+                      Text('Failed to submit form. Please try again later.'),
+                ),
+              );
+            }
+          } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Failed to submit form. Please try again later.'),
               ),
             );
+            print('Error sending webhook: $e');
           }
-        } catch (e) {
+        } else {
+          int remainingTime =
+              _cooldownDuration - (currentTime - lastSubmissionTime);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to submit form. Please try again later.'),
+              content: Text(
+                'Please wait $remainingTime seconds before submitting again.',
+              ),
             ),
           );
-          print('Error sending webhook: $e');
         }
       }
     }
@@ -284,5 +315,3 @@ class GlassBox extends StatelessWidget {
     );
   }
 }
-
-//
